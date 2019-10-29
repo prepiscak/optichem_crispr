@@ -1,7 +1,12 @@
 # CRISPR analysis
 
+# A. crispr_screen_EDA.R
+# B. crispr_screen_filtering.R
+# C. crispr_screen_results.R
+
 # loading libraries ----
 library("readr") # reading in files
+library("readxl")
 
 library("dplyr") # data.frame manipulation
 library("tidyr")
@@ -9,6 +14,7 @@ library("tibble")
 library("skimr") # summary for data.frame
 # plots
 library("ggplot2")
+library("ggrepel")
 library("ggpubr")
 library("pheatmap")
 
@@ -27,7 +33,9 @@ dir.create(RESULTS_DIR)
 # [ ] libA investigate genes with duplicated sequences!!! (Tceal1? or other genes from list?)
 
 # all samples
-
+metadata_all_file <- paste0(DATASETS_DIR, "crispr_invivo_metadata.xlsx")
+metadata_all <- readxl::read_xlsx(metadata_all_file)
+  
 raw_counts_all_file <- paste0(DATASETS_DIR, "total_all_tax_mock_counts/total_all_tax_mock.count.txt")
 raw_counts_all <- readr::read_tsv(raw_counts_all_file)
 
@@ -48,8 +56,8 @@ raw_counts <- readr::read_tsv(raw_counts_file)
 # count_summary_file <- paste0(DATASETS_DIR, "total_tax_mock_counts/total_tax_mock.countsummary.txt")
 # count_summary <- as.data.frame(readr::read_tsv(count_summary_file))
 
-norm_counts_file <- paste0(DATASETS_DIR, "total_tax_mock_counts/total_tax_mock.count_normalized.txt")
-norm_counts <- readr::read_tsv(norm_counts_file)
+norm_counts_tax_file <- paste0(DATASETS_DIR, "total_tax_mock_counts/total_tax_mock.count_normalized.txt")
+norm_counts_tax <- readr::read_tsv(norm_counts_tax_file)
 
 # re-normalized (total) counts only for mock and tax
 # [ ] filter and run mageck test
@@ -214,43 +222,87 @@ save(count_summary_all_clean,
 
 #################### Principal component analysis ################
 
-ntop_genes=nrow(norm_counts_all_log2) # default 500
-#rld_counts_ntop <- rnaSelectTopVarGenes_var(rld_counts, ntop = ntop_genes)
-norm_counts_all_log2_ntop <- rnaSelectTopVarGenes(norm_counts_all_log2, ntop = 65959)
+# all samples
+pca_all <- stats::prcomp(t(norm_counts_all_log2),center=TRUE)
 
-pca_all <- stats::prcomp(t(norm_counts_all_log2), center = TRUE)
+pca_all_percentVar <- pca_all$sdev^2/sum(pca_all$sdev^2)
+
+pca_all_data <- data.frame(PC1 = pca_all$x[, 1], 
+                           PC2 = pca_all$x[, 2], 
+                           sample_label=names(pca_all$x[, 1])) %>%
+  dplyr::left_join(., metadata_all, by="sample_label") %>%
+  dplyr::mutate(condition = if_else(sample_label == "pretrt_VH2VH12VH22", "pretrt", condition)) %>% # populating condition for merged pre-treatment
+  dplyr::mutate(condition = factor(condition, levels = c("plasmid", "pretrt", "mock", "tax")))
+
+pca_all_plot <- ggscatter(data = pca_all_data, 
+                          x = "PC1", y = "PC2", 
+                          color = "condition", 
+                          label = "sample_label",
+                          repel = TRUE,
+                          xlab = paste0("PC1: ", round(pca_all_percentVar[1] * 100), "% variance"),
+                          ylab = paste0("PC2: ", round(pca_all_percentVar[2] * 100), "% variance")) 
+
+# pca_all_plot <- ggplot(data = pca_all_data, 
+#                  aes_string(x = "PC1", y = "PC2", color = "condition")) + 
+#   geom_point(size = 3) + 
+#   xlab(paste0("PC1: ", round(pca_all_percentVar[1] * 100), "% variance")) + 
+#   ylab(paste0("PC2: ", round(pca_all_percentVar[2] * 100), "% variance")) + 
+#   coord_fixed() + 
+#   theme_bw()
+
+# mock and tax 
+norm_counts_tax_log2 <- norm_counts_tax %>%
+  dplyr::select(-Gene) %>%
+  dplyr::mutate_at(vars(-matches("sgRNA")), function(x) log2(x+1)) %>%
+  tibble::column_to_rownames(., var="sgRNA") 
+
+pca_tax <- stats::prcomp(t(norm_counts_tax_log2),center=TRUE)
+
+pca_tax_percentVar <- pca_tax$sdev^2/sum(pca_tax$sdev^2)
+
+pca_tax_data <- data.frame(PC1 = pca_tax$x[, 1], 
+                           PC2 = pca_tax$x[, 2], 
+                           sample_label=names(pca_tax$x[, 1])) %>%
+  dplyr::left_join(., metadata_all, by="sample_label") 
 
 
+pca_tax_plot <- ggscatter(data = pca_tax_data, 
+                          x = "PC1", y = "PC2", 
+                          color = "condition", 
+                          label = "sample_label",
+                          repel = TRUE,
+                          xlab = paste0("PC1: ", round(pca_tax_percentVar[1] * 100), "% variance"),
+                          ylab = paste0("PC2: ", round(pca_tax_percentVar[2] * 100), "% variance")) 
 
-# if less than 5 components needed plot otherwise skip; maybe update up to 5 components?
-pca_all_data <- data.frame(PC1 = pca_all$x[, 1], PC2 = pca_all$x[, 2], sample_label=names(pca_all$x[, 1])) %>%
-  dplyr::mutate(condition=gsub(pattern = "(.+)(_VH.+)", replacement = "\\1", sample_label)) %>%
-  dplyr::mutate(batch)
 
+# pca_tax_plot <- ggplot(data = pca_tax_data, 
+#                        aes_string(x = "PC1", y = "PC2", color = "condition", label = "sample_label")) + 
+#   geom_point(size = 3) + 
+#   geom_text_repel() +
+#   xlab(paste0("PC1: ", round(pca_tax_percentVar[1] * 100), "% variance")) + 
+#   ylab(paste0("PC2: ", round(pca_tax_percentVar[2] * 100), "% variance")) + 
+#   coord_fixed() + 
+#   theme_bw()
 
+# selecting ntop most variable
+# MAD <- apply(norm_counts_tax_log2, 1, mad)
+# ords <- names(sort(MAD[MAD > mad_cutoff], decreasing=TRUE)) #[MAD > mad_cutoff]
+# norm_counts_tax_log2_ntop <- norm_counts_tax_log2[ords, ]
 
+# saving data ----
+ggsave(filename = paste0(RESULTS_DIR, "pca_all_plot.pdf"), plot=pca_all_plot)
+ggsave(filename = paste0(RESULTS_DIR, "pca_tax_plot.pdf"), plot=pca_tax_plot)
 
-pcaData <- plotPCA(rld_filt, intgroup=c("condition", "date_preparation"), returnData=TRUE, ntop=16821)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
-PCA_individual_effect <- ggplot(pcaData, aes(PC1, PC2, color=condition, shape=date_preparation)) +
-  geom_point(size=3) +
-  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
-  ylab(paste0("PC2: ",percentVar[2],"% variance")) #+ coord_fixed()
-
-# Principal component analysis and correlation plots ----
-
-pca <- prcomp(t(norm_counts_all_log2),center=TRUE)
-
-percentVar <- pca$sdev^2/sum(pca$sdev^2)
-#condition = run_details$Condition[run_details$Sample.names == colnames(slmat)]
-
-d <- data.frame(PC1 = pca$x[, 1], PC2 = pca$x[, 2], sample_label=names(pca$x[, 1])) %>%
-  dplyr::mutate(condition=gsub(pattern = "(.+)(_VH.+)", replacement = "\\1", sample_label)) 
-  
-pca_all = ggplot(data = d, aes_string(x = "PC1", y = "PC2", color = "condition")) + 
-  geom_point(size = 3) + xlab(paste0("PC1: ", round(percentVar[1] * 100), "% variance")) + 
-  ylab(paste0("PC2: ", round(percentVar[2] * 100), "% variance")) + coord_fixed() + 
-  theme_bw()
+# Saving S2S plots to RData object
+save(count_summary_all_clean,
+     norm_counts_all_log2,
+     norm_counts_all_log2_gather,
+     norm_counts_all_dens_plot, 
+     norm_counts_all_boxplot, 
+     norm_counts_tax_log2,
+     pca_all_plot,
+     pca_tax_plot,
+     file = paste0(RESULTS_DIR, "crispr_screen_EDA.RData"))
 
 #################### Correlation matrix ################
 ### Compute pairwise correlation values
@@ -292,38 +344,81 @@ save(count_summary_all_clean,
      norm_counts_all_log2_gather,
      norm_counts_all_dens_plot, 
      norm_counts_all_boxplot, 
+     norm_counts_tax_log2,
+     pca_all_plot,
+     pca_tax_plot,
      S2S_pearson_plot,
      S2S_spearman_plot,
      file = paste0(RESULTS_DIR, "crispr_screen_EDA.RData"))
 
 
-  
- 
+#################### essential genesets enrichment ################
+# plasmid -> pre-treatment                                                                                                                                                                                           
+# pre-treatment -> mock and tax   
+
+pretreatment_vs_plasmid_file <- "/media/prepisca/DataAnalysis1/optichem_crispr/optichem_crispr/results/pretreatment_vs_plasmid/pretreatment_vs_plasmid.gene_summary.txt"  
+pretreatment_vs_plasmid <- readr::read_tsv(pretreatment_vs_plasmid_file)
+
+# Gene set enrichment analysis
+# 1. converting mouse gene symbols to human gene symbols
+# 2. removing NA in negative selection fdr
+# 3. ranking based on neg|lfc
+# 4. performing gene set enrichment analysis using reactome, kegg, hallmarks gene sets
+
+pretreatment_vs_plasmid_filt <- pretreatment_vs_plasmid %>%
+  dplyr::select(id, `neg|fdr`, `neg|lfc`) %>%
+  dplyr::rename()
+
+# 1.
+require("biomaRt")
+require("RCurl") 
+
+
+convertMouse2humanEntrezIDs <- function(geneList=NULL, filters = "entrezgene", ensembl_version="Ensembl Genes 92", biomart_host="http://apr2018.archive.ensembl.org"){
+  human <- biomaRt::useMart("ensembl", dataset="hsapiens_gene_ensembl", host=biomart_host, version=ensembl_version)
+  mouse <- biomaRt::useMart("ensembl", dataset="mmusculus_gene_ensembl", host=biomart_host, version=ensembl_version)
+  out <- biomaRt::getLDS(attributes = c("ensembl_gene_id"), filters = filters, values = geneList, mart = mouse, 
+                         attributesL = c("ensembl_gene_id","hgnc_symbol", "entrezgene","description", "chromosome_name", "start_position", "end_position", "strand"), 
+                         martL = human)
+  return(out)
+}
 
 
 
 
 
+GeneSet_DIR="/media/prepisca/DATA/Work/GeneSets/MSigDB/v6.2_EntrezIDs/"
 
+# "c2.cp.biocarta.v6.2.entrez.gmt", 
+genesets_list = list("h.all.v6.2.entrez.gmt",
+                     "c1.all.v6.2.entrez.gmt",
+                     "c2.cp.v6.2.entrez.gmt", "c2.cp.kegg.v6.2.entrez.gmt", "c2.cp.reactome.v6.2.entrez.gmt", "c2.cgp.v6.2.entrez.gmt",
+                     "c5.bp.v6.2.entrez.gmt", "c5.cc.v6.2.entrez.gmt", "c5.mf.v6.2.entrez.gmt",
+                     "c6.all.v6.2.entrez.gmt",
+                     "c7.all.v6.2.entrez.gmt")
 
+# "c2.cp.biocarta.v6.2.entrez.gmt", 
+genesets_list = list("h.all.v6.2.entrez.gmt")
 
-
-
+# log2FC ranking
+# [ ] different runs give slightly different results (as expected)
+# [ ] original clusterProfiler::GSEA give same resutls irrespective if seed=FALSE or seed=TRUE
+cat("GSEA analysis using log2FC ranking\n")
+enrich_gsea_human_log2FC <- runGSEA(rnk_list=rnk_log2FC_geneList_human, 
+                                    genesets_list=genesets_list,
+                                    genesets_dir=GeneSet_DIR,
+                                    nperm=1e+05, 
+                                    min_GS_size=10, 
+                                    max_GS_size=500,
+                                    padj_cutoff=1,
+                                    ncores=8,
+                                    seed = FALSE)
 
 
 
 
 
 # test mageck-flute
-library("MAGeCKFlute")
-
-MapRatesView(count_summary)
-IdentBarView(count_summary, x = "Label", y = "GiniIndex", 
-             ylab = "Gini index", main = "Evenness of sgRNA reads")
-count_summary$Missed = log10(count_summary$Zerocounts)
-IdentBarView(count_summary, x = "Label", y = "Missed", fill = "#394E80",
-             ylab = "Log10 missed gRNAs", main = "Missed sgRNAs")
-
 
 
 libA_file <- "/media/prepisca/DataAnalysis1/optichem_crispr/reanalysis/DatasetsRaw/mock_tax/fastq/trimmed_fastq/Mouse_GeCKOv2_libA_09Mar2015_ForMageck.csv"
