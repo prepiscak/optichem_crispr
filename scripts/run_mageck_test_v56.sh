@@ -9,8 +9,8 @@ CONTROL_IDs="mock_VH1_IL,mock_VH3_I2L2R,mock_VH4_II2R,mock_VH5_IIL,mock_VH6_IIR,
 
 # total normalization mock, tax - filtering expression and number of sgRNAs and removing non-target
 # using raw counts after filtering and re-normalizing
-OUTPUT_PREFIX="tax_mock_renorm"
-OUTPUT_DIR="tax_mock_renorm"
+OUTPUT_PREFIX="tax_mock_test"
+OUTPUT_DIR="tax_mock_test"
 count_table="./crispr_screen_filter/raw_counts_tax_filt_exp_sgrnas_rm_nontarget.tsv"
 
 mkdir ${OUTPUT_DIR}

@@ -16,6 +16,7 @@ library("dplyr") # data.frame manipulation
 library("tidyr")
 library("tibble") 
 library("skimr") # summary for data.frame
+
 # plots
 library("ggplot2")
 library("ggrepel")
@@ -130,6 +131,7 @@ count_summary_all_clean <- count_summary_all_upd %>%
 count_summary_all_clean_cond_only <- count_summary_all_clean %>%
   dplyr::filter(condition != "plasmid" & condition != "pretrt")
 
+skimr::skim(count_summary_all_clean)
 skimr::skim(count_summary_all_clean_cond_only)
 
 # saving table
@@ -233,8 +235,9 @@ pca_all_data <- data.frame(PC1 = pca_all$x[, 1],
 pca_all_plot <- ggscatter(data = pca_all_data, 
                           x = "PC1", y = "PC2", 
                           color = "condition", 
-                          label = "sample_label",
+                          #label = "sample_label",
                           repel = TRUE,
+                          size=5,
                           xlab = paste0("PC1: ", round(pca_all_percentVar[1] * 100), "% variance"),
                           ylab = paste0("PC2: ", round(pca_all_percentVar[2] * 100), "% variance")) 
 
@@ -257,8 +260,9 @@ pca_tax_data <- data.frame(PC1 = pca_tax$x[, 1],
 pca_tax_plot <- ggscatter(data = pca_tax_data, 
                           x = "PC1", y = "PC2", 
                           color = "condition", 
-                          label = "sample_label",
+                          #label = "sample_label",
                           repel = TRUE,
+                          size=5,
                           xlab = paste0("PC1: ", round(pca_tax_percentVar[1] * 100), "% variance"),
                           ylab = paste0("PC2: ", round(pca_tax_percentVar[2] * 100), "% variance")) 
 

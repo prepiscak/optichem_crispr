@@ -17,7 +17,7 @@ library("tibble")
 
 #################### Loading datasets ################
 DATASETS_DIR="./datasets/"
-RESULTS_DIR="./results/crispr_screen_filter/"
+RESULTS_DIR="./datasets/crispr_screen_filter/"
 dir.create(RESULTS_DIR, recursive=TRUE)
 
 # mock and tax
