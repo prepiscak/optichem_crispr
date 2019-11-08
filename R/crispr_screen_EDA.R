@@ -281,6 +281,11 @@ color = colorRampPalette(rev(RColorBrewer::brewer.pal(n = 7, name = "RdYlBu")))(
 # pearson correlation
 norm_counts_all_log2_cor <- cor(norm_counts_all_log2, method = "pearson")    ## cor() is a base R function
 
+write.table(as.data.frame(norm_counts_all_log2_cor), 
+            sep = "\t", 
+            col.names = TRUE, row.names = TRUE,
+            file = paste0(RESULTS_DIR, "norm_counts_all_log2_cor.tsv"))
+
 S2S_pearson_plot <- pheatmap(norm_counts_all_log2_cor, color = color, border_color=NA, 
                              fontsize = 10, fontsize_row = 10, height=20, 
                              breaks = correlation_breaks,
