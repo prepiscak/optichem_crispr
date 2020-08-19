@@ -1,9 +1,9 @@
 # Optichem CRISPR screen
 
-scripts directory:
-  1. pre-processing - (e.g. MAGeCK)
+scripts directory:  
+- pre-processing - (e.g. MAGeCK)
 
-R directory:
-  2. exploratory data analysis (EDA)
-  3. filtering  
-  4. final results analysis and enrichment  
+R directory:  
+- exploratory data analysis (EDA)  
+- filtering  
+- final results analysis and enrichment    
